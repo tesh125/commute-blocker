@@ -39,7 +39,7 @@ const DEFAULT_WEATHER_LEAD_DAYS = 2; // stamp the forecast onto the block this m
 // needs their own Maps API key — the key lives server-side on whoever
 // deployed the proxy. Running your own instead of a shared deployment?
 // Replace this with your own Vercel URL (same value as in options.js).
-const PROXY_BASE_URL = "https://commute-blocker-proxy.vercel.app";
+const PROXY_BASE_URL = "https://commute-blocker.vercel.app";
 
 let lastTabTriggerAt = 0;
 

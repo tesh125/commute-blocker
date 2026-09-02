@@ -19,7 +19,7 @@ const TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"];
 
 // Same proxy background.js talks to — see PROXY_BASE_URL there for why, and
 // keep the two in sync if you're pointing at your own deployment.
-const PROXY_BASE_URL = "https://commute-blocker-proxy.vercel.app";
+const PROXY_BASE_URL = "https://commute-blocker.vercel.app";
 
 async function getProxyHeaders() {
   let { clientId, proxyAccessCode } = await chrome.storage.local.get({

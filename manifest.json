@@ -7,7 +7,7 @@
   "host_permissions": [
     "https://www.googleapis.com/*",
     "https://calendar.google.com/*",
-    "https://commute-blocker-proxy.vercel.app/*"
+    "https://commute-blocker.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js"

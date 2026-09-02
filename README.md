@@ -52,7 +52,7 @@ skip the whole "Google Cloud project for Maps" step entirely — see below.
 ### 3. Proxy access
 
 This repo is already wired to a live shared proxy
-(`https://commute-blocker-proxy.vercel.app`, set as `PROXY_BASE_URL` in both
+(`https://commute-blocker.vercel.app`, set as `PROXY_BASE_URL` in both
 `background.js` and `options.js`, and in `manifest.json`'s `host_permissions`) — no
 Maps API key setup needed, nothing to change here for the default case.
 
