@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Commute Blocker — Settings</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --border: #e3e6ea;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff4ff;
+      --success: #16a34a;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+    header.hero { margin-bottom: 32px; }
+    header.hero h1 { font-size: 28px; margin: 0; }
+    section.card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    section.card h2 { font-size: 15px; margin: 0 0 16px; }
+    .field { margin-top: 16px; }
+    .field:first-child { margin-top: 0; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="password"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    p.hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 6px 0 0;
+      line-height: 1.5;
+    }
+    .row { display: flex; gap: 16px; }
+    .row > .field { flex: 1; margin-top: 0; }
+    .keyRow { display: flex; gap: 8px; align-items: center; }
+    .keyRow input { flex: 1; }
+    .locationRow { display: flex; gap: 8px; align-items: center; }
+    .connectRow { display: flex; gap: 8px; align-items: center; }
+    #connectedAccount {
+      font-size: 12px;
+      color: var(--success);
+      font-weight: 600;
+      display: none;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+    }
+    .btn-secondary {
+      padding: 10px 14px;
+      font-size: 13px;
+      background: #eef0f3;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .btn-secondary:hover { background: #e2e5ea; }
+    .btn-primary {
+      padding: 12px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    #locationStatus {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .modeGrid { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+    .modeGrid label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: normal;
+      margin: 0;
+    }
+    .modeGrid input[type="checkbox"] { width: auto; }
+    .checkboxField { display: flex; align-items: center; gap: 8px; }
+    .checkboxField input { width: auto; }
+    .checkboxField label { margin: 0; font-weight: normal; }
+    .footer-bar {
+      position: sticky;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 0 4px;
+      background: linear-gradient(to top, var(--bg) 65%, transparent);
+    }
+    #saved {
+      display: none;
+      font-size: 13px;
+      color: var(--success);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <h1>Commute Blocker</h1>
+    </header>
+
+    <section class="card">
+      <h2>Home location</h2>
+
+      <div class="field">
+        <label>Detect automatically</label>
+        <div class="locationRow">
+          <button type="button" id="useLocation" class="btn-secondary">📍 Use my current location</button>
+          <span id="locationStatus"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="homeAddress">Or type an address</label>
+        <input id="homeAddress" type="text" placeholder="123 Main St, Springfield, IL" />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Shared proxy access</h2>
+      <div class="field">
+        <label for="proxyAccessCode">Access code</label>
+        <div class="keyRow">
+          <input id="proxyAccessCode" type="password" placeholder="Leave blank unless you were given one" autocomplete="off" />
+          <button id="toggleKey" type="button" class="btn-secondary">Show</button>
+        </div>
+        <p class="hint">Transit routing and weather go through a shared server — no Maps API key needed here. Only fill this in if whoever runs that server gave you an access code.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Google Calendar</h2>
+      <div class="field">
+        <div class="connectRow">
+          <button type="button" id="connectCalendar" class="btn-secondary">Connect Google Calendar</button>
+          <span id="connectedAccount"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="targetCalendarId">Calendar to add commute/evening blocks to</label>
+        <select id="targetCalendarId">
+          <option value="primary">Primary calendar</option>
+        </select>
+        <p class="hint" id="calendarListHint">Connect above to see your calendars.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Timing &amp; blocking</h2>
+      <div class="row">
+        <div class="field">
+          <label for="bufferMinutes">Extra buffer (min)</label>
+          <input id="bufferMinutes" type="number" min="0" value="5" />
+        </div>
+        <div class="field">
+          <label for="pollMinutes">Check every (min)</label>
+          <input id="pollMinutes" type="number" min="5" value="15" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="blockUntilHour">After an in-person event, block the evening until (24h)</label>
+        <input id="blockUntilHour" type="number" min="0" max="23" value="20" />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Transit routing</h2>
+      <div class="field">
+        <label>Transit types to allow</label>
+        <div class="modeGrid">
+          <label><input type="checkbox" id="mode_BUS" checked /> Bus</label>
+          <label><input type="checkbox" id="mode_SUBWAY" checked /> Subway</label>
+          <label><input type="checkbox" id="mode_TRAIN" checked /> Train</label>
+          <label><input type="checkbox" id="mode_LIGHT_RAIL" checked /> Light rail</label>
+          <label><input type="checkbox" id="mode_RAIL" checked /> Rail</label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="avoidKeywords">Avoid transit lines/agencies</label>
+        <input id="avoidKeywords" type="text" placeholder="UP Express, Union Pearson" />
+      </div>
+      <div class="field">
+        <label for="priorityKeywords">Prioritize transit lines</label>
+        <input id="priorityKeywords" type="text" placeholder="GO Train, Line 1, Line 2" />
+      </div>
+      <div class="field">
+        <label for="earlyOptionMinutes">Also show an "earlier" option, this many minutes ahead (min)</label>
+        <input id="earlyOptionMinutes" type="number" min="0" value="20" />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Weather</h2>
+      <div class="field checkboxField">
+        <input type="checkbox" id="weatherEnabled" checked />
+        <label for="weatherEnabled">Add a weather forecast to the commute block</label>
+      </div>
+      <div class="field">
+        <label for="weatherLeadDays">Check weather this many days before the event</label>
+        <input id="weatherLeadDays" type="number" min="0" max="9" value="2" />
+      </div>
+    </section>
+
+    <div class="footer-bar">
+      <button id="save" class="btn-primary">Save settings</button>
+      <div id="saved">Saved.</div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

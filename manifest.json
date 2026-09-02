@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Commute Blocker",
+  "version": "1.0.0",
+  "description": "Scans your Google Calendar for events with a location and automatically blocks transit time on your calendar before them.",
+  "permissions": ["identity", "alarms", "storage"],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://calendar.google.com/*",
+    "https://commute-blocker-proxy.vercel.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Commute Blocker"
+  },
+  "options_page": "options.html",
+  "oauth2": {
+    "client_id": "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/calendar.readonly"
+    ]
+  }
+}

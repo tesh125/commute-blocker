@@ -1,0 +1,12 @@
+{
+  "name": "commute-blocker-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serverless proxy for Commute Blocker's Google Routes/Geocoding/Weather calls — keeps MAPS_API_KEY server-side.",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "devDependencies": {
+    "vercel": "^37.0.0"
+  }
+}
