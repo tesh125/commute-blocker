@@ -18,7 +18,7 @@
   },
   "options_page": "options.html",
   "oauth2": {
-    "client_id": "YOUR_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "975372553776-raaqrlsi4got0d7mjkr7nqh6sledhmcr.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/calendar.events",
       "https://www.googleapis.com/auth/calendar.readonly"
