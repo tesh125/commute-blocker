@@ -1,7 +1,7 @@
-// Everything except the proxy access code lives in sync storage (fine to
-// roam across your signed-in Chrome instances). The access code lives in
-// local storage only, same as the client ID below, so neither ever leaves
-// this machine via Chrome account sync.
+// Everything here lives in sync storage (fine to roam across your
+// signed-in Chrome instances) except the per-install client ID, which is
+// local-only (see getProxyHeaders() below) since it identifies this
+// specific install to the proxy's rate limiter, not your Google account.
 const SYNC_FIELDS = [
   "homeAddress",
   "bufferMinutes",
@@ -13,8 +13,7 @@ const SYNC_FIELDS = [
   "earlyOptionMinutes",
   "weatherLeadDays",
 ];
-const CHECKBOX_FIELDS = ["weatherEnabled"]; // plain boolean checkboxes, not part of the transit-mode grid
-const LOCAL_FIELDS = ["proxyAccessCode"];
+const CHECKBOX_FIELDS = ["weatherEnabled", "avoidTolls", "avoidHighways"]; // plain boolean checkboxes
 const TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"]; // transit vehicle-category checkboxes
 
 // Same proxy background.js talks to — see PROXY_BASE_URL there for why, and
@@ -22,18 +21,23 @@ const TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"]; // transi
 const PROXY_BASE_URL = "https://commute-blocker.vercel.app";
 
 async function getProxyHeaders() {
-  let { clientId, proxyAccessCode } = await chrome.storage.local.get({
-    clientId: null,
-    proxyAccessCode: "",
-  });
+  let { clientId } = await chrome.storage.local.get({ clientId: null });
   if (!clientId) {
     clientId = crypto.randomUUID();
     await chrome.storage.local.set({ clientId });
   }
-  const headers = { "X-Client-Id": clientId };
-  if (proxyAccessCode) headers["X-Access-Code"] = proxyAccessCode;
-  return headers;
+  return { "X-Client-Id": clientId };
 }
+
+// Shows/hides the transit-only vs. driving-only option groups based on
+// which "Travel mode" radio is selected.
+function updateTravelModeVisibility() {
+  const isDrive = document.getElementById("travelMode_DRIVE").checked;
+  document.getElementById("transitOptions").hidden = isDrive;
+  document.getElementById("drivingOptions").hidden = !isDrive;
+}
+document.getElementById("travelMode_TRANSIT").addEventListener("change", updateTravelModeVisibility);
+document.getElementById("travelMode_DRIVE").addEventListener("change", updateTravelModeVisibility);
 
 // homeLat/homeLng aren't tied to a text input — they're set via the
 // geolocation button below — so they're tracked separately from the visible
@@ -69,10 +73,14 @@ document.getElementById("useLocation").addEventListener("click", () => {
         } else {
           // The Geocoding API returns HTTP 200 even on failure, with the
           // real reason in data.status (e.g. REQUEST_DENIED, ZERO_RESULTS,
-          // or OVER_QUERY_LIMIT if you've hit the proxy's hourly cap).
-          // Surface it instead of a generic message.
-          console.warn("Geocoding proxy error", data.status, data.error_message || data.error);
-          status.textContent = `Location detected, but couldn't resolve it to an address (${data.status || "unknown error"}). It'll still be used for routing — or type an address below instead.`;
+          // or OVER_QUERY_LIMIT if you've hit the proxy's hourly cap) — but
+          // our own proxy also reports its own errors (e.g. a missing
+          // MAPS_API_KEY on the server) as status "UNKNOWN_ERROR" with the
+          // real reason in data.error, so surface that detail too instead
+          // of just the status code.
+          const detail = data.error_message || data.error;
+          console.warn("Geocoding proxy error", data.status, detail);
+          status.textContent = `Location detected, but couldn't resolve it to an address (${data.status || "unknown error"}${detail ? `: ${detail}` : ""}). It'll still be used for routing — or type an address below instead.`;
         }
       } catch {
         status.textContent = "Location detected, but the address lookup failed. It'll still be used for routing — or type an address below instead.";
@@ -231,14 +239,12 @@ async function load() {
     earlyOptionMinutes: 20,
     weatherEnabled: true,
     weatherLeadDays: 2,
+    avoidTolls: false,
+    avoidHighways: false,
   });
-  const localStored = await chrome.storage.local.get({ proxyAccessCode: "" });
 
   for (const key of SYNC_FIELDS) {
     document.getElementById(key).value = syncStored[key];
-  }
-  for (const key of LOCAL_FIELDS) {
-    document.getElementById(key).value = localStored[key];
   }
   for (const key of CHECKBOX_FIELDS) {
     document.getElementById(key).checked = !!syncStored[key];
@@ -246,6 +252,7 @@ async function load() {
   document.getElementById(
     syncStored.travelMode === "DRIVE" ? "travelMode_DRIVE" : "travelMode_TRANSIT"
   ).checked = true;
+  updateTravelModeVisibility();
   for (const mode of TRAVEL_MODES) {
     document.getElementById(`mode_${mode}`).checked = syncStored.allowedTravelModes.includes(mode);
   }
@@ -277,13 +284,6 @@ async function save() {
 
   await chrome.storage.sync.set(syncValues);
 
-  const localValues = {};
-  for (const key of LOCAL_FIELDS) {
-    const el = document.getElementById(key);
-    localValues[key] = el.value.trim();
-  }
-  await chrome.storage.local.set(localValues);
-
   // Ask the background worker to reschedule the alarm in case pollMinutes changed.
   chrome.runtime.sendMessage({ type: "RESCHEDULE_ALARM" });
 
@@ -293,13 +293,5 @@ async function save() {
 }
 
 document.getElementById("save").addEventListener("click", save);
-
-document.getElementById("toggleKey").addEventListener("click", () => {
-  const input = document.getElementById("proxyAccessCode");
-  const btn = document.getElementById("toggleKey");
-  const showing = input.type === "text";
-  input.type = showing ? "password" : "text";
-  btn.textContent = showing ? "Show" : "Hide";
-});
 
 load();

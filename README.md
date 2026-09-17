@@ -2,10 +2,10 @@
 
 A Chrome extension that scans your Google Calendar for events with a location and
 automatically adds a "Commute" block on your calendar before each one — sized to the
-actual transit time (via the Google Routes API), with an optional early-departure
-alternative and a weather forecast added a couple of days out. It also blocks the rest
-of the evening after an in-person event, so your calendar reflects reality instead of
-looking wide open right after you get home.
+actual transit or driving time (via the Google Routes API), with an optional
+early-departure alternative (transit) and a weather forecast added a couple of days
+out. It also blocks the rest of the evening after an in-person event, so your
+calendar reflects reality instead of looking wide open right after you get home.
 
 ## How the two secrets are handled
 
@@ -56,10 +56,9 @@ This repo is already wired to a live shared proxy
 `background.js` and `options.js`, and in `manifest.json`'s `host_permissions`) — no
 Maps API key setup needed, nothing to change here for the default case.
 
-If you were given an access code for it, open Settings → **Shared proxy access** and
-paste it in — otherwise leave that field blank. If you'd rather point at a different
-proxy (your own, or someone else's), replace `PROXY_BASE_URL` in both files and the
-matching entry in `manifest.json`'s `host_permissions`, then reload the extension.
+If you'd rather point at a different proxy (your own, or someone else's), replace
+`PROXY_BASE_URL` in both files and the matching entry in `manifest.json`'s
+`host_permissions`, then reload the extension.
 
 ### 4. Set your home location and connect
 
@@ -95,10 +94,6 @@ this up for others):
      are using the deployment (e.g. a public Chrome Web Store listing) — see
      `.env.example` for how to size it against the Maps API's pricing. Pair it
      with a budget alert in Google Cloud Console as the real backstop.
-   - `PROXY_ACCESS_CODE` — optional. If set, only requests carrying a matching
-     `X-Access-Code` header are served. Share this value with people out-of-band
-     (text, not GitHub) if you want to gate who can use your deployment; leave it
-     unset to run it open.
 4. Deploy. Vercel auto-detects the functions in `api/` — no build config needed.
 5. Update `PROXY_BASE_URL` in `background.js` and `options.js`, and
    `host_permissions` in `manifest.json`, to your new `https://<project>.vercel.app`
@@ -114,9 +109,7 @@ locally, sent as a header) means one misbehaving install can't eat the whole hou
 budget for everyone else on the same deployment. It's enforced in memory inside the
 serverless function, which is good enough to catch a stuck retry loop or a bug — it
 is **not** a hard guarantee against deliberate abuse, since a new serverless instance
-(e.g. after a cold start) starts its own counter from zero. Combine it with an access
-code if you're sharing the deployment with people you trust but still want a floor
-against a leaked URL being hit directly.
+(e.g. after a cold start) starts its own counter from zero.
 
 That per-person cap doesn't bound total spend, though — every new install just adds
 another bucket. If the extension is going out via a public Chrome Web Store listing
@@ -171,15 +164,15 @@ approaching, the 100-test-user cap):
 | Setting | What it does |
 |---|---|
 | Home location | Origin for every transit calculation — detected via geolocation or typed as an address. |
-| Shared proxy access code | Only needed if the person who deployed the proxy gave you one. Local-only, never synced. |
 | Extra buffer (min) | Padding added on top of the raw transit estimate. |
 | Check every (min) | How often the background poll runs (minimum 5). |
 | Block the evening until | After an in-person event, blocks your calendar until this hour so the evening doesn't look free. |
 | Calendar to add blocks to | Which calendar receives the generated blocks — defaults to your primary one. |
-| Travel mode | Transit (default) or Driving. Driving skips the transit-only options below and can't target an arrival time, so it estimates from current traffic conditions rather than the event's actual start time. |
-| Transit types to allow | Broad category filter (bus/subway/train/light rail/rail) from the Routes API. Transit mode only. |
-| Avoid / prioritize transit lines | Free-text keyword matching against each route's line/agency name, for finer control than the category filter gives you. |
-| "Earlier" option | Adds a second itinerary targeting an earlier arrival, shown alongside the on-time one. |
+| Travel mode | Transit (default) or Driving. Picking one shows only the options relevant to it. |
+| Transit types to allow | *Transit mode.* Broad category filter (bus/subway/train/light rail/rail) from the Routes API. |
+| Avoid / prioritize transit lines | *Transit mode.* Free-text keyword matching against each route's line/agency name, for finer control than the category filter gives you. |
+| "Earlier" option | *Transit mode.* Adds a second itinerary targeting an earlier arrival, shown alongside the on-time one. Not available for driving — the Routes API can't target an arrival time for a drive, only current-traffic duration from now. |
+| Avoid tolls / avoid highways | *Driving mode.* Passed to the Routes API as route modifiers. |
 | Weather forecast | Adds a forecast for the event's location a configurable number of days out. |
 
 ## Project structure
@@ -192,7 +185,7 @@ options.html/js  Settings page — all configuration
 api/routes.js    Proxies Routes API (transit ETAs)
 api/geocode.js   Proxies Geocoding API (forward + reverse)
 api/weather.js   Proxies Weather API (forecast)
-api/_shared.js   Rate limiting + optional access-code check, shared by the above
+api/_shared.js   Rate limiting, shared by the above
 ```
 
 ## License

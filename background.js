@@ -50,17 +50,12 @@ let lastTabTriggerAt = 0;
 // Generated once and kept in local storage — never synced, unrelated to any
 // Google account.
 async function getProxyHeaders() {
-  let { clientId, proxyAccessCode } = await chrome.storage.local.get({
-    clientId: null,
-    proxyAccessCode: "",
-  });
+  let { clientId } = await chrome.storage.local.get({ clientId: null });
   if (!clientId) {
     clientId = crypto.randomUUID();
     await chrome.storage.local.set({ clientId });
   }
-  const headers = { "X-Client-Id": clientId };
-  if (proxyAccessCode) headers["X-Access-Code"] = proxyAccessCode;
-  return headers;
+  return { "X-Client-Id": clientId };
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -129,9 +124,11 @@ async function runCheck() {
     targetCalendarId: "primary", // chosen from the dropdown in Settings
     travelMode: DEFAULT_TRAVEL_MODE, // "TRANSIT" or "DRIVE" — Settings radio buttons
     allowedTravelModes: [...ALL_TRAVEL_MODES], // Settings mode checkboxes (transit only)
-    avoidKeywords: DEFAULT_AVOID_KEYWORDS, // Settings "avoid" text field
-    priorityKeywords: "", // Settings "prioritize" text field
-    earlyOptionMinutes: DEFAULT_EARLY_OPTION_MINUTES, // Settings "earlier by" field
+    avoidKeywords: DEFAULT_AVOID_KEYWORDS, // Settings "avoid" text field (transit only)
+    priorityKeywords: "", // Settings "prioritize" text field (transit only)
+    earlyOptionMinutes: DEFAULT_EARLY_OPTION_MINUTES, // Settings "earlier by" field (transit only)
+    avoidTolls: false, // Settings driving checkbox
+    avoidHighways: false, // Settings driving checkbox
     weatherEnabled: true,
     weatherLeadDays: DEFAULT_WEATHER_LEAD_DAYS,
   });
@@ -175,15 +172,17 @@ async function runCheck() {
     if (!beforeBlock) {
       const eventStart = new Date(event.start.dateTime);
       const travelMode = settings.travelMode === "DRIVE" ? "DRIVE" : DEFAULT_TRAVEL_MODE;
-      const onTimeTransit = await getTransitInfo(
-        homeOrigin,
-        event.location,
-        event.start.dateTime,
-        travelMode,
-        settings.allowedTravelModes,
-        settings.avoidKeywords,
-        settings.priorityKeywords
-      );
+      const onTimeTransit =
+        travelMode === "DRIVE"
+          ? await getDrivingInfo(homeOrigin, event.location, settings.avoidTolls, settings.avoidHighways)
+          : await getTransitInfo(
+              homeOrigin,
+              event.location,
+              event.start.dateTime,
+              settings.allowedTravelModes,
+              settings.avoidKeywords,
+              settings.priorityKeywords
+            );
       if (onTimeTransit == null) {
         transitFailures++;
       } else {
@@ -205,7 +204,6 @@ async function runCheck() {
             homeOrigin,
             event.location,
             earlyArrivalDate.toISOString(),
-            travelMode,
             settings.allowedTravelModes,
             settings.avoidKeywords,
             settings.priorityKeywords
@@ -484,10 +482,11 @@ async function createCommuteEvent(
 ) {
   const minutes = Math.round(onTimeTransit.durationSeconds / 60);
   const modeLabel = travelMode === "DRIVE" ? "Driving" : "Transit";
-  const distancePart =
+  const distanceDetail =
     travelMode === "DRIVE" && onTimeTransit.distanceMiles != null
-      ? ` (${onTimeTransit.distanceMiles} mi)`
+      ? [`${onTimeTransit.distanceMiles} mi`, onTimeTransit.modifiersSummary].filter(Boolean).join(", ")
       : "";
+  const distancePart = distanceDetail ? ` (${distanceDetail})` : "";
   const sections = [];
   if (earlyTransit !== undefined) {
     sections.push(formatItinerarySection("Earlier option", earlyTransit, earlyArrivalDate));
@@ -583,13 +582,10 @@ async function getTransitInfo(
   origin,
   destinationAddress,
   arrivalTimeISO,
-  travelMode,
   allowedTravelModes,
   avoidKeywordsRaw,
   priorityKeywordsRaw
 ) {
-  if (travelMode === "DRIVE") return getDrivingInfo(origin, destinationAddress);
-
   const transitPreferences = { routingPreference: "FEWER_TRANSFERS" };
   const modes = Array.isArray(allowedTravelModes) ? allowedTravelModes : ALL_TRAVEL_MODES;
   // Only send allowedTravelModes if it's an actual restriction — sending the
@@ -641,19 +637,26 @@ async function getTransitInfo(
 // of the drive rather than a prediction for the event's actual start time.
 // That's a reasonable approximation for how long the drive takes; it just
 // can't account for traffic patterns specific to that future time of day.
-async function getDrivingInfo(origin, destinationAddress) {
+async function getDrivingInfo(origin, destinationAddress, avoidTolls, avoidHighways) {
+  const routeModifiers = {};
+  if (avoidTolls) routeModifiers.avoidTolls = true;
+  if (avoidHighways) routeModifiers.avoidHighways = true;
+
+  const body = {
+    origin,
+    destination: { address: destinationAddress },
+    travelMode: "DRIVE",
+    routingPreference: "TRAFFIC_AWARE",
+  };
+  if (Object.keys(routeModifiers).length > 0) body.routeModifiers = routeModifiers;
+
   const res = await fetch(`${PROXY_BASE_URL}/api/routes`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(await getProxyHeaders()),
     },
-    body: JSON.stringify({
-      origin,
-      destination: { address: destinationAddress },
-      travelMode: "DRIVE",
-      routingPreference: "TRAFFIC_AWARE",
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -672,7 +675,17 @@ async function getDrivingInfo(origin, destinationAddress) {
       typeof route.distanceMeters === "number"
         ? Math.round((route.distanceMeters / 1609.34) * 10) / 10
         : null,
+    modifiersSummary: summarizeDrivingModifiers(avoidTolls, avoidHighways),
   };
+}
+
+// "avoiding tolls", "avoiding highways", "avoiding tolls and highways", or
+// null if neither is set — folded into the commute block's summary line.
+function summarizeDrivingModifiers(avoidTolls, avoidHighways) {
+  const parts = [];
+  if (avoidTolls) parts.push("tolls");
+  if (avoidHighways) parts.push("highways");
+  return parts.length ? `avoiding ${parts.join(" and ")}` : null;
 }
 
 // "UP Express, Union Pearson" -> ["UP Express", "Union Pearson"], order kept

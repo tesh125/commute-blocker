@@ -39,21 +39,9 @@ function getClientId(req) {
   return "unknown";
 }
 
-// Optional extra gate: if PROXY_ACCESS_CODE is set in Vercel's env vars,
-// only requests carrying a matching X-Access-Code header are allowed. Share
-// that code with people out-of-band (text, not GitHub) — unlike the Maps
-// API key, it's cheap to rotate if it ever leaks: just change the env var.
-// Leave PROXY_ACCESS_CODE unset to skip this check entirely.
-function checkAccessCode(req) {
-  const required = process.env.PROXY_ACCESS_CODE;
-  if (!required) return true;
-  return req.headers["x-access-code"] === required;
-}
-
-// Applies the access-code gate, the per-client cap, and (if configured) a
-// combined-across-everyone global cap, writing rate-limit headers either
-// way. Returns true if the caller should proceed; on false it has already
-// sent the (401 or 429) response.
+// Applies the per-client cap and (if configured) a combined-across-everyone
+// global cap, writing rate-limit headers either way. Returns true if the
+// caller should proceed; on false it has already sent the 429 response.
 //
 // The per-client cap (HOURLY_REQUEST_CAP, default 60/hr) stops one
 // misbehaving install from eating the budget, but it doesn't cap total
@@ -70,11 +58,6 @@ function checkAccessCode(req) {
 // since a cold start resets this counter to zero.
 function enforce(req, res, routeName) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-
-  if (!checkAccessCode(req)) {
-    res.status(401).json({ error: "Missing or invalid access code." });
-    return false;
-  }
 
   const perClientLimit = Number(process.env.HOURLY_REQUEST_CAP) || DEFAULT_HOURLY_CAP;
   const { allowed, limit, remaining, resetAt } = checkRateLimit(

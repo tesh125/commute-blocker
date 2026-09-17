@@ -71,8 +71,6 @@
     }
     .row { display: flex; gap: 16px; }
     .row > .field { flex: 1; margin-top: 0; }
-    .keyRow { display: flex; gap: 8px; align-items: center; }
-    .keyRow input { flex: 1; }
     .locationRow { display: flex; gap: 8px; align-items: center; }
     .connectRow { display: flex; gap: 8px; align-items: center; }
     #connectedAccount {
@@ -127,6 +125,7 @@
       margin: 0;
     }
     .travelModeRow input[type="radio"] { width: auto; }
+    .modeOptions { margin-top: 16px; }
     .checkboxField { display: flex; align-items: center; gap: 8px; }
     .checkboxField input { width: auto; }
     .checkboxField label { margin: 0; font-weight: normal; }
@@ -167,18 +166,6 @@
       <div class="field">
         <label for="homeAddress">Or type an address</label>
         <input id="homeAddress" type="text" placeholder="123 Main St, Springfield, IL" />
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Shared proxy access</h2>
-      <div class="field">
-        <label for="proxyAccessCode">Access code</label>
-        <div class="keyRow">
-          <input id="proxyAccessCode" type="password" placeholder="Leave blank unless you were given one" autocomplete="off" />
-          <button id="toggleKey" type="button" class="btn-secondary">Show</button>
-        </div>
-        <p class="hint">Transit routing and weather go through a shared server — no Maps API key needed here. Only fill this in if whoever runs that server gave you an access code.</p>
       </div>
     </section>
 
@@ -225,33 +212,43 @@
           <label><input type="radio" name="travelMode" id="travelMode_TRANSIT" value="TRANSIT" checked /> Transit</label>
           <label><input type="radio" name="travelMode" id="travelMode_DRIVE" value="DRIVE" /> Driving</label>
         </div>
-        <p class="hint">The transit routing options below only apply when Transit is selected.</p>
       </div>
-    </section>
 
-    <section class="card">
-      <h2>Transit routing</h2>
-      <div class="field">
-        <label>Transit types to allow</label>
-        <div class="modeGrid">
-          <label><input type="checkbox" id="mode_BUS" checked /> Bus</label>
-          <label><input type="checkbox" id="mode_SUBWAY" checked /> Subway</label>
-          <label><input type="checkbox" id="mode_TRAIN" checked /> Train</label>
-          <label><input type="checkbox" id="mode_LIGHT_RAIL" checked /> Light rail</label>
-          <label><input type="checkbox" id="mode_RAIL" checked /> Rail</label>
+      <div id="transitOptions" class="modeOptions">
+        <div class="field">
+          <label>Transit types to allow</label>
+          <div class="modeGrid">
+            <label><input type="checkbox" id="mode_BUS" checked /> Bus</label>
+            <label><input type="checkbox" id="mode_SUBWAY" checked /> Subway</label>
+            <label><input type="checkbox" id="mode_TRAIN" checked /> Train</label>
+            <label><input type="checkbox" id="mode_LIGHT_RAIL" checked /> Light rail / streetcar</label>
+            <label><input type="checkbox" id="mode_RAIL" checked /> Rail</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="avoidKeywords">Avoid transit lines/agencies</label>
+          <input id="avoidKeywords" type="text" placeholder="UP Express, Union Pearson" />
+        </div>
+        <div class="field">
+          <label for="priorityKeywords">Prioritize transit lines</label>
+          <input id="priorityKeywords" type="text" placeholder="GO Train, Line 1, Line 2" />
+        </div>
+        <div class="field">
+          <label for="earlyOptionMinutes">Also show an "earlier" option, this many minutes ahead (min)</label>
+          <input id="earlyOptionMinutes" type="number" min="0" value="20" />
         </div>
       </div>
-      <div class="field">
-        <label for="avoidKeywords">Avoid transit lines/agencies</label>
-        <input id="avoidKeywords" type="text" placeholder="UP Express, Union Pearson" />
-      </div>
-      <div class="field">
-        <label for="priorityKeywords">Prioritize transit lines</label>
-        <input id="priorityKeywords" type="text" placeholder="GO Train, Line 1, Line 2" />
-      </div>
-      <div class="field">
-        <label for="earlyOptionMinutes">Also show an "earlier" option, this many minutes ahead (min)</label>
-        <input id="earlyOptionMinutes" type="number" min="0" value="20" />
+
+      <div id="drivingOptions" class="modeOptions" hidden>
+        <div class="field checkboxField">
+          <input type="checkbox" id="avoidTolls" />
+          <label for="avoidTolls">Avoid tolls</label>
+        </div>
+        <div class="field checkboxField">
+          <input type="checkbox" id="avoidHighways" />
+          <label for="avoidHighways">Avoid highways</label>
+        </div>
+        <p class="hint">Driving doesn't support targeting an arrival time, so there's no "earlier" alternative shown — just a current-traffic estimate.</p>
       </div>
     </section>
 
