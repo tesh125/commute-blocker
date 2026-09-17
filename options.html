@@ -117,6 +117,16 @@
       margin: 0;
     }
     .modeGrid input[type="checkbox"] { width: auto; }
+    .travelModeRow { display: flex; gap: 18px; }
+    .travelModeRow label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: normal;
+      margin: 0;
+    }
+    .travelModeRow input[type="radio"] { width: auto; }
     .checkboxField { display: flex; align-items: center; gap: 8px; }
     .checkboxField input { width: auto; }
     .checkboxField label { margin: 0; font-weight: normal; }
@@ -204,6 +214,18 @@
       <div class="field">
         <label for="blockUntilHour">After an in-person event, block the evening until (24h)</label>
         <input id="blockUntilHour" type="number" min="0" max="23" value="20" />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Travel mode</h2>
+      <div class="field">
+        <label>How commute time is calculated</label>
+        <div class="travelModeRow">
+          <label><input type="radio" name="travelMode" id="travelMode_TRANSIT" value="TRANSIT" checked /> Transit</label>
+          <label><input type="radio" name="travelMode" id="travelMode_DRIVE" value="DRIVE" /> Driving</label>
+        </div>
+        <p class="hint">The transit routing options below only apply when Transit is selected.</p>
       </div>
     </section>
 

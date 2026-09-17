@@ -8,10 +8,12 @@
 //     days get picked up on the very next poll after they're created, not
 //     just when they get close.
 //  2. For each timed event that has a `location` and hasn't already been
-//     processed, we ask the Routes API for a transit ETA from the user's
-//     home address, arriving by the event's start time — plus a second
-//     Routes API call targeting an earlier arrival, so the block's
-//     description can show both an "earlier" and "on-time" itinerary.
+//     processed, we ask the Routes API for a transit or driving ETA (per
+//     the "Travel mode" setting) from the user's home address, arriving by
+//     the event's start time — plus, for transit, a second Routes API call
+//     targeting an earlier arrival, so the block's description can show
+//     both an "earlier" and "on-time" itinerary. Driving doesn't support
+//     targeting an arrival time, so only the on-time estimate applies.
 //  3. We create a "Commute" event ending at the event's start time, tagged
 //     with extendedProperties.private.sourceEventId so re-runs (including
 //     re-scanning the same event on every poll) don't create duplicates.
@@ -125,7 +127,8 @@ async function runCheck() {
     bufferMinutes: DEFAULT_BUFFER_MINUTES,
     blockUntilHour: DEFAULT_BLOCK_UNTIL_HOUR,
     targetCalendarId: "primary", // chosen from the dropdown in Settings
-    allowedTravelModes: [...ALL_TRAVEL_MODES], // Settings mode checkboxes
+    travelMode: DEFAULT_TRAVEL_MODE, // "TRANSIT" or "DRIVE" — Settings radio buttons
+    allowedTravelModes: [...ALL_TRAVEL_MODES], // Settings mode checkboxes (transit only)
     avoidKeywords: DEFAULT_AVOID_KEYWORDS, // Settings "avoid" text field
     priorityKeywords: "", // Settings "prioritize" text field
     earlyOptionMinutes: DEFAULT_EARLY_OPTION_MINUTES, // Settings "earlier by" field
@@ -171,10 +174,12 @@ async function runCheck() {
     let beforeBlock = await findBlockEvent(token, targetCalendarId, event, "sourceEventId");
     if (!beforeBlock) {
       const eventStart = new Date(event.start.dateTime);
+      const travelMode = settings.travelMode === "DRIVE" ? "DRIVE" : DEFAULT_TRAVEL_MODE;
       const onTimeTransit = await getTransitInfo(
         homeOrigin,
         event.location,
         event.start.dateTime,
+        travelMode,
         settings.allowedTravelModes,
         settings.avoidKeywords,
         settings.priorityKeywords
@@ -189,16 +194,23 @@ async function runCheck() {
 
         // Second, earlier-target Routes API call so the description can
         // show a "leave earlier" alternative alongside the on-time one.
-        const earlyMinutes = Number(settings.earlyOptionMinutes) || DEFAULT_EARLY_OPTION_MINUTES;
-        const earlyArrivalDate = new Date(eventStart.getTime() - earlyMinutes * 60 * 1000);
-        const earlyTransit = await getTransitInfo(
-          homeOrigin,
-          event.location,
-          earlyArrivalDate.toISOString(),
-          settings.allowedTravelModes,
-          settings.avoidKeywords,
-          settings.priorityKeywords
-        );
+        // Driving doesn't support targeting an arrival time (only transit
+        // does), so this is skipped entirely in DRIVE mode.
+        let earlyTransit;
+        let earlyArrivalDate;
+        if (travelMode === "TRANSIT") {
+          const earlyMinutes = Number(settings.earlyOptionMinutes) || DEFAULT_EARLY_OPTION_MINUTES;
+          earlyArrivalDate = new Date(eventStart.getTime() - earlyMinutes * 60 * 1000);
+          earlyTransit = await getTransitInfo(
+            homeOrigin,
+            event.location,
+            earlyArrivalDate.toISOString(),
+            travelMode,
+            settings.allowedTravelModes,
+            settings.avoidKeywords,
+            settings.priorityKeywords
+          );
+        }
 
         beforeBlock = await createCommuteEvent(
           token,
@@ -206,6 +218,7 @@ async function runCheck() {
           event,
           commuteStart,
           eventStart,
+          travelMode,
           onTimeTransit,
           earlyTransit,
           earlyArrivalDate
@@ -464,11 +477,17 @@ async function createCommuteEvent(
   sourceEvent,
   start,
   end,
+  travelMode,
   onTimeTransit,
   earlyTransit,
   earlyArrivalDate
 ) {
   const minutes = Math.round(onTimeTransit.durationSeconds / 60);
+  const modeLabel = travelMode === "DRIVE" ? "Driving" : "Transit";
+  const distancePart =
+    travelMode === "DRIVE" && onTimeTransit.distanceMiles != null
+      ? ` (${onTimeTransit.distanceMiles} mi)`
+      : "";
   const sections = [];
   if (earlyTransit !== undefined) {
     sections.push(formatItinerarySection("Earlier option", earlyTransit, earlyArrivalDate));
@@ -478,7 +497,7 @@ async function createCommuteEvent(
 
   const body = {
     summary: "Commute",
-    description: `Auto-created by Commute Blocker.\nTransit time: ~${minutes} min to ${sourceEvent.location}${routeText}`,
+    description: `Auto-created by Commute Blocker.\n${modeLabel} time: ~${minutes} min${distancePart} to ${sourceEvent.location}${routeText}`,
     start: { dateTime: start.toISOString() },
     end: { dateTime: end.toISOString() },
     extendedProperties: {
@@ -558,15 +577,19 @@ async function createAfterEventBlock(token, calendarId, sourceEvent, start, end,
 //    ranked list, and use trip duration only as the final tiebreaker.
 const ALL_TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"];
 const DEFAULT_AVOID_KEYWORDS = "UP Express, Union Pearson";
+const DEFAULT_TRAVEL_MODE = "TRANSIT"; // Settings "Travel mode" radio — "TRANSIT" or "DRIVE"
 
 async function getTransitInfo(
   origin,
   destinationAddress,
   arrivalTimeISO,
+  travelMode,
   allowedTravelModes,
   avoidKeywordsRaw,
   priorityKeywordsRaw
 ) {
+  if (travelMode === "DRIVE") return getDrivingInfo(origin, destinationAddress);
+
   const transitPreferences = { routingPreference: "FEWER_TRANSFERS" };
   const modes = Array.isArray(allowedTravelModes) ? allowedTravelModes : ALL_TRAVEL_MODES;
   // Only send allowedTravelModes if it's an actual restriction — sending the
@@ -609,6 +632,46 @@ async function getTransitInfo(
   return {
     durationSeconds: parseInt(durationStr.replace("s", ""), 10),
     stepsSummary: summarizeTransitSteps(route),
+  };
+}
+
+// Driving equivalent of getTransitInfo(). The Routes API only supports
+// targeting an *arrival* time for TRANSIT — DRIVE requests a departure time
+// instead (defaulting to now), so this returns a live traffic-aware estimate
+// of the drive rather than a prediction for the event's actual start time.
+// That's a reasonable approximation for how long the drive takes; it just
+// can't account for traffic patterns specific to that future time of day.
+async function getDrivingInfo(origin, destinationAddress) {
+  const res = await fetch(`${PROXY_BASE_URL}/api/routes`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(await getProxyHeaders()),
+    },
+    body: JSON.stringify({
+      origin,
+      destination: { address: destinationAddress },
+      travelMode: "DRIVE",
+      routingPreference: "TRAFFIC_AWARE",
+    }),
+  });
+
+  if (!res.ok) {
+    console.warn("Routes proxy error", res.status, await res.text());
+    return null;
+  }
+  const data = await res.json();
+  const route = (data.routes || [])[0];
+  const durationStr = route?.duration; // e.g. "1834s"
+  if (!durationStr) return null;
+
+  return {
+    durationSeconds: parseInt(durationStr.replace("s", ""), 10),
+    stepsSummary: null, // turn-by-turn isn't shown for driving, just the summary line
+    distanceMiles:
+      typeof route.distanceMeters === "number"
+        ? Math.round((route.distanceMeters / 1609.34) * 10) / 10
+        : null,
   };
 }
 

@@ -13,9 +13,9 @@ const SYNC_FIELDS = [
   "earlyOptionMinutes",
   "weatherLeadDays",
 ];
-const CHECKBOX_FIELDS = ["weatherEnabled"]; // plain boolean checkboxes, not part of the travel-mode grid
+const CHECKBOX_FIELDS = ["weatherEnabled"]; // plain boolean checkboxes, not part of the transit-mode grid
 const LOCAL_FIELDS = ["proxyAccessCode"];
-const TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"];
+const TRAVEL_MODES = ["BUS", "SUBWAY", "TRAIN", "LIGHT_RAIL", "RAIL"]; // transit vehicle-category checkboxes
 
 // Same proxy background.js talks to — see PROXY_BASE_URL there for why, and
 // keep the two in sync if you're pointing at your own deployment.
@@ -224,6 +224,7 @@ async function load() {
     pollMinutes: 15,
     blockUntilHour: 20,
     targetCalendarId: "primary",
+    travelMode: "TRANSIT",
     avoidKeywords: "UP Express, Union Pearson",
     priorityKeywords: "",
     allowedTravelModes: [...TRAVEL_MODES], // all allowed by default
@@ -242,6 +243,9 @@ async function load() {
   for (const key of CHECKBOX_FIELDS) {
     document.getElementById(key).checked = !!syncStored[key];
   }
+  document.getElementById(
+    syncStored.travelMode === "DRIVE" ? "travelMode_DRIVE" : "travelMode_TRANSIT"
+  ).checked = true;
   for (const mode of TRAVEL_MODES) {
     document.getElementById(`mode_${mode}`).checked = syncStored.allowedTravelModes.includes(mode);
   }
@@ -258,6 +262,8 @@ async function save() {
   }
   syncValues.homeLat = homeLat;
   syncValues.homeLng = homeLng;
+
+  syncValues.travelMode = document.getElementById("travelMode_DRIVE").checked ? "DRIVE" : "TRANSIT";
 
   const checkedModes = TRAVEL_MODES.filter((mode) => document.getElementById(`mode_${mode}`).checked);
   // Treat "nothing checked" the same as "everything checked" — an empty

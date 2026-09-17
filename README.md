@@ -90,6 +90,11 @@ this up for others):
    - `MAPS_API_KEY` — the key from step 1. Required.
    - `HOURLY_REQUEST_CAP` — optional, max requests per hour per person per endpoint.
      Defaults to 60.
+   - `GLOBAL_HOURLY_CAP` — optional, max requests per hour per endpoint *combined
+     across everyone*. Only matters once more than a handful of people you know
+     are using the deployment (e.g. a public Chrome Web Store listing) — see
+     `.env.example` for how to size it against the Maps API's pricing. Pair it
+     with a budget alert in Google Cloud Console as the real backstop.
    - `PROXY_ACCESS_CODE` — optional. If set, only requests carrying a matching
      `X-Access-Code` header are served. Share this value with people out-of-band
      (text, not GitHub) if you want to gate who can use your deployment; leave it
@@ -104,14 +109,21 @@ For local testing: `npm install`, copy `.env.example` to `.env` and fill in
 
 ### Why the rate cap, and its limit
 
-The cap is per-person (each install generates its own random client ID, stored
-locally, sent as a header) so one misbehaving install can't eat the whole hour's
+The per-person cap (each install generates its own random client ID, stored
+locally, sent as a header) means one misbehaving install can't eat the whole hour's
 budget for everyone else on the same deployment. It's enforced in memory inside the
 serverless function, which is good enough to catch a stuck retry loop or a bug — it
 is **not** a hard guarantee against deliberate abuse, since a new serverless instance
 (e.g. after a cold start) starts its own counter from zero. Combine it with an access
 code if you're sharing the deployment with people you trust but still want a floor
 against a leaked URL being hit directly.
+
+That per-person cap doesn't bound total spend, though — every new install just adds
+another bucket. If the extension is going out via a public Chrome Web Store listing
+rather than to people you know, also set `GLOBAL_HOURLY_CAP` (a combined-across-
+everyone ceiling per endpoint) and a budget alert in Google Cloud Console on the
+project holding `MAPS_API_KEY`. The budget alert is the one that actually matters —
+it doesn't reset on a cold start the way the in-memory caps do.
 
 ## Settings reference
 
@@ -123,7 +135,8 @@ against a leaked URL being hit directly.
 | Check every (min) | How often the background poll runs (minimum 5). |
 | Block the evening until | After an in-person event, blocks your calendar until this hour so the evening doesn't look free. |
 | Calendar to add blocks to | Which calendar receives the generated blocks — defaults to your primary one. |
-| Transit types to allow | Broad category filter (bus/subway/train/light rail/rail) from the Routes API. |
+| Travel mode | Transit (default) or Driving. Driving skips the transit-only options below and can't target an arrival time, so it estimates from current traffic conditions rather than the event's actual start time. |
+| Transit types to allow | Broad category filter (bus/subway/train/light rail/rail) from the Routes API. Transit mode only. |
 | Avoid / prioritize transit lines | Free-text keyword matching against each route's line/agency name, for finer control than the category filter gives you. |
 | "Earlier" option | Adds a second itinerary targeting an earlier arrival, shown alongside the on-time one. |
 | Weather forecast | Adds a forecast for the event's location a configurable number of days out. |

@@ -11,8 +11,7 @@ const DEFAULT_HOURLY_CAP = 60;
 // many different instances at once.
 const buckets = new Map(); // key -> { count, windowStart }
 
-function checkRateLimit(key) {
-  const limit = Number(process.env.HOURLY_REQUEST_CAP) || DEFAULT_HOURLY_CAP;
+function checkRateLimit(key, limit) {
   const now = Date.now();
   let bucket = buckets.get(key);
   if (!bucket || now - bucket.windowStart >= WINDOW_MS) {
@@ -51,9 +50,24 @@ function checkAccessCode(req) {
   return req.headers["x-access-code"] === required;
 }
 
-// Applies the access-code gate and rate limit together, and writes the
-// rate-limit headers either way. Returns true if the caller should proceed;
-// on false it has already sent the (401 or 429) response.
+// Applies the access-code gate, the per-client cap, and (if configured) a
+// combined-across-everyone global cap, writing rate-limit headers either
+// way. Returns true if the caller should proceed; on false it has already
+// sent the (401 or 429) response.
+//
+// The per-client cap (HOURLY_REQUEST_CAP, default 60/hr) stops one
+// misbehaving install from eating the budget, but it doesn't cap total
+// spend: with a public Chrome Web Store listing, every new install adds
+// another 60/hr bucket, and the Maps API key's Google Cloud bill is on
+// whoever deployed the proxy. GLOBAL_HOURLY_CAP is a second, unkeyed bucket
+// shared by every caller of a given route, meant as a blunt ceiling on
+// total requests/hour (and therefore roughly on cost) regardless of how
+// many people are using the deployment. It's optional and unset by
+// default — for a private/friends deployment the per-client cap alone is
+// usually enough; set it once the proxy is behind a public listing. Same
+// in-memory caveat as the per-client cap: pair it with a budget alert in
+// Google Cloud Console (Billing -> Budgets & alerts) as the real backstop,
+// since a cold start resets this counter to zero.
 function enforce(req, res, routeName) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
@@ -62,12 +76,27 @@ function enforce(req, res, routeName) {
     return false;
   }
 
-  const { allowed, limit, remaining, resetAt } = checkRateLimit(`${routeName}:${getClientId(req)}`);
+  const perClientLimit = Number(process.env.HOURLY_REQUEST_CAP) || DEFAULT_HOURLY_CAP;
+  const { allowed, limit, remaining, resetAt } = checkRateLimit(
+    `${routeName}:${getClientId(req)}`,
+    perClientLimit
+  );
   res.setHeader("X-RateLimit-Limit", String(limit));
   res.setHeader("X-RateLimit-Remaining", String(remaining));
   if (!allowed) {
     res.status(429).json({ error: "Hourly request cap reached — try again later.", resetAt });
     return false;
+  }
+
+  const globalLimit = Number(process.env.GLOBAL_HOURLY_CAP);
+  if (globalLimit > 0) {
+    const global = checkRateLimit(`global:${routeName}`, globalLimit);
+    if (!global.allowed) {
+      res
+        .status(429)
+        .json({ error: "This shared deployment has hit its overall hourly cap — try again later.", resetAt: global.resetAt });
+      return false;
+    }
   }
 
   return true;

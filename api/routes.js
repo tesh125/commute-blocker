@@ -1,9 +1,10 @@
 // api/routes.js — Vercel serverless function
 // Proxies the Routes API's computeRoutes so MAPS_API_KEY never reaches the
-// browser. background.js posts the same { origin, destination, travelMode,
-// arrivalTime, computeAlternativeRoutes, transitPreferences } body it used
-// to send straight to Google; this just forwards it with the key attached
-// server-side.
+// browser. background.js posts the same body it used to send straight to
+// Google — { origin, destination, travelMode, arrivalTime,
+// computeAlternativeRoutes, transitPreferences } for transit, or
+// { origin, destination, travelMode: "DRIVE", routingPreference } for
+// driving — this just forwards it with the key attached server-side.
 const { enforce } = require("./_shared");
 
 module.exports = async function handler(req, res) {
@@ -24,7 +25,7 @@ module.exports = async function handler(req, res) {
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": process.env.MAPS_API_KEY,
-        "X-Goog-FieldMask": "routes.duration,routes.legs",
+        "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.legs",
       },
       body: JSON.stringify(req.body),
     });
