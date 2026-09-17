@@ -125,6 +125,47 @@ everyone ceiling per endpoint) and a budget alert in Google Cloud Console on the
 project holding `MAPS_API_KEY`. The budget alert is the one that actually matters —
 it doesn't reset on a cold start the way the in-memory caps do.
 
+## Publishing to the Chrome Web Store
+
+The Web Store listing and Google's OAuth consent screen are separate systems with
+separate review processes:
+
+- **Chrome Web Store listing** (Developer Dashboard → your item → Store presence) —
+  a one-time $5 developer registration, then a review focused on the extension's
+  code and requested permissions. Can be set Public independent of OAuth status;
+  typically resolves in hours to a few days.
+- **OAuth consent screen** (Google Cloud Console → APIs & Services → OAuth consent
+  screen) — while it's in **Testing** status, only the specific Google accounts
+  you list as test users (up to 100) can complete "Connect Google Calendar"; anyone
+  else gets blocked outright. You can publish the extension itself to the Store
+  while still in Testing and add test users as people ask to connect — just start
+  the verification process (below) well before you approach the 100 cap, since new
+  installers can't connect at all once it's hit and verification isn't done yet.
+
+`index.html` and `privacy.html` in this repo are served automatically at your
+proxy's root (e.g. `https://commute-blocker.vercel.app/` and `.../privacy.html`) —
+no extra deployment step. Use those URLs for the consent screen's "Application home
+page" and "Application privacy policy link" fields, and for the Chrome Web Store
+listing's required privacy policy link.
+
+To move the OAuth consent screen to production (required once you're past, or
+approaching, the 100-test-user cap):
+
+1. Fill in App info, the home page / privacy policy links above, and developer
+   contact info in the OAuth consent screen.
+2. Add an **Authorized domain** you actually own — `*.vercel.app` and `*.github.io`
+   don't qualify (they're on the public suffix list, which Google's verification
+   explicitly rejects). A cheap registered domain (~$10-20/yr) pointed at this same
+   Vercel project as a custom domain works and costs nothing extra beyond the
+   registration; verify it in Google Search Console.
+3. Write a short justification for each requested scope (`calendar.readonly`,
+   `calendar.events`) explaining how it's used.
+4. Submit for verification. `calendar.readonly`/`calendar.events` are "sensitive"
+   scopes, not "restricted" ones (the tier requiring a paid CASA security
+   assessment — e.g. broad Gmail/Drive access), so expect standard review: Google
+   may ask for a short screen recording of the consent flow and how each granted
+   scope is used, with a few email round-trips. Budget roughly 1-4 weeks.
+
 ## Settings reference
 
 | Setting | What it does |
