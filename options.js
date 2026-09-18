@@ -229,7 +229,7 @@ async function load() {
     homeLat: null,
     homeLng: null,
     bufferMinutes: 5,
-    pollMinutes: 15,
+    pollMinutes: 1440,
     blockUntilHour: 20,
     targetCalendarId: "primary",
     travelMode: "TRANSIT",

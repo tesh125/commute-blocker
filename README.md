@@ -70,9 +70,9 @@ Settings has two ways to set where transit times are calculated from:
   home. Typing here clears any detected location.
 
 Then click the extension icon → **Connect Google Calendar** → grant access. Click
-**Check now** to run an immediate scan, or just wait — it checks automatically every
-15 minutes (configurable in Settings) and also re-checks whenever a Google Calendar
-tab finishes loading.
+**Check now** to run an immediate scan, or just wait — it checks automatically once
+a day by default (configurable in Settings, minimum 5 minutes) and also re-checks
+whenever a Google Calendar tab finishes loading.
 
 ## Deploying your own proxy instead
 
@@ -165,7 +165,7 @@ approaching, the 100-test-user cap):
 |---|---|
 | Home location | Origin for every transit calculation — detected via geolocation or typed as an address. |
 | Extra buffer (min) | Padding added on top of the raw transit estimate. |
-| Check every (min) | How often the background poll runs (minimum 5). |
+| Check every (min) | How often the background poll runs (minimum 5, default 1440 = once a day). |
 | Block the evening until | After an in-person event, blocks your calendar until this hour so the evening doesn't look free. |
 | Calendar to add blocks to | Which calendar receives the generated blocks — defaults to your primary one. |
 | Travel mode | Transit (default) or Driving. Picking one shows only the options relevant to it. |

@@ -1,7 +1,7 @@
 // background.js — Commute Blocker service worker
 //
 // Flow:
-//  1. Every POLL_ALARM fires (every pollMinutes, default 15), we look ahead
+//  1. Every POLL_ALARM fires (every pollMinutes, default once a day), we look ahead
 //     LOOKAHEAD_DAYS across every calendar on the account — owned, shared
 //     with you, and subscribed — not just the primary one. This window
 //     covers a full month, so newly added events anywhere in the next 30
@@ -31,7 +31,7 @@
 //     extendedProperties.private.weatherAdded.
 
 const ALARM_NAME = "commute-blocker-poll";
-const DEFAULT_POLL_MINUTES = 15;
+const DEFAULT_POLL_MINUTES = 1440; // once a day
 const LOOKAHEAD_DAYS = 30; // scan a full month ahead on every check
 const DEFAULT_BUFFER_MINUTES = 5; // extra padding added to the commute block
 const TAB_TRIGGER_DEBOUNCE_MS = 60 * 1000; // don't re-run more than once/min from tab activity
