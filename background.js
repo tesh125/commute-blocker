@@ -7,10 +7,13 @@
 //     covers a full month, so newly added events anywhere in the next 30
 //     days get picked up on the very next poll after they're created, not
 //     just when they get close.
-//  2. For each timed event that has a `location` and hasn't already been
-//     processed, we ask the Routes API for a transit or driving ETA (per
-//     the "Travel mode" setting) from the user's home address, arriving by
-//     the event's start time — plus, for transit, a second Routes API call
+//  2. Only the earliest in-person event of each calendar day gets a
+//     pre-event commute block — a day with several meetings would
+//     otherwise get one "Commute" block per meeting, stacked earlier and
+//     earlier that morning, which is redundant. For that first event, we
+//     ask the Routes API for a transit or driving ETA (per the "Travel
+//     mode" setting) from the user's home address, arriving by the
+//     event's start time — plus, for transit, a second Routes API call
 //     targeting an earlier arrival, so the block's description can show
 //     both an "earlier" and "on-time" itinerary. Driving doesn't support
 //     targeting an arrival time, so only the on-time estimate applies.
@@ -161,15 +164,23 @@ async function runCheck() {
   }
 
   const events = await listUpcomingEvents(token, calendars);
+  const firstCommuteEventOfDay = pickFirstEventPerDay(events);
 
   let created = 0;
   let transitFailures = 0; // events with a location where the Routes API call didn't return a route
   for (const event of events) {
     if (shouldSkip(event)) continue;
 
-    // --- Pre-event commute block ---
-    let beforeBlock = await findBlockEvent(token, targetCalendarId, event, "sourceEventId");
-    if (!beforeBlock) {
+    // --- Pre-event commute block: only for the day's earliest in-person
+    // event. Back-to-back meetings the same day would otherwise each get
+    // their own "Commute" block stacked earlier and earlier that morning,
+    // which is redundant — one commute block per day is enough. ---
+    const dayKey = new Date(event.start.dateTime).toDateString();
+    const isFirstCommuteEventOfDay = firstCommuteEventOfDay.get(dayKey) === event;
+    let beforeBlock = isFirstCommuteEventOfDay
+      ? await findBlockEvent(token, targetCalendarId, event, "sourceEventId")
+      : null;
+    if (isFirstCommuteEventOfDay && !beforeBlock) {
       const eventStart = new Date(event.start.dateTime);
       const travelMode = settings.travelMode === "DRIVE" ? "DRIVE" : DEFAULT_TRAVEL_MODE;
       const onTimeTransit =
@@ -302,6 +313,24 @@ function shouldSkip(event) {
   if (event.summary === "Commute") return true; // our own before-block
   if (event.summary && event.summary.startsWith("Blocked until")) return true; // our own after-block
   return false;
+}
+
+// Maps each calendar day (by local date) to its earliest non-skipped
+// (in-person, has a location) event — the only one that gets a pre-event
+// "Commute" block on that day. Uses the runtime's local timezone via
+// toDateString(), matching how the rest of the app already reasons about
+// "today"/"the event's day" elsewhere (e.g. formatTimeLabel).
+function pickFirstEventPerDay(events) {
+  const firstByDay = new Map();
+  for (const event of events) {
+    if (shouldSkip(event)) continue;
+    const dayKey = new Date(event.start.dateTime).toDateString();
+    const current = firstByDay.get(dayKey);
+    if (!current || new Date(event.start.dateTime) < new Date(current.start.dateTime)) {
+      firstByDay.set(dayKey, event);
+    }
+  }
+  return firstByDay;
 }
 
 // Events can come from any calendar on the account now, and event IDs are
